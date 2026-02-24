@@ -1,0 +1,102 @@
+# TML Capture Kit — Pipeline Definition
+# Machine-readable DAG for skill composition.
+# An agent reads this to understand execution order, data flow,
+# and human gates without parsing prose from seven SKILL.md files.
+
+name: tml-capture-pipeline
+version: "1.0.0"
+description: >-
+  End-to-end architecture capture. Takes unstructured content about a
+  business, team, process, or system and produces a plain-language
+  architecture map with visible reasoning and actionable opportunities.
+orchestrator: tml-capture
+
+# The pipeline as an ordered sequence.
+# Each stage declares its skill, what it takes, what it produces,
+# whether a human gate is required before proceeding, and whether
+# the stage can be skipped.
+
+stages:
+  - id: extract
+    skill: tml-extract
+    inputs:
+      - context-dump
+    outputs:
+      - candidate-primitives
+    human-gate: false
+    skippable: true
+    skip-condition: "No documents provided — interview runs cold-start"
+
+  - id: interview
+    skill: tml-interview
+    inputs:
+      - candidate-primitives   # warm-start (from extract)
+      - context-dump           # cold-start fallback (if extract skipped)
+    outputs:
+      - confirmed-primitives
+      - conversation-log
+    human-gate: true
+    gate-description: "Human participates in the interview itself"
+    skippable: false
+
+  - id: infer
+    skill: tml-infer
+    inputs:
+      - confirmed-primitives
+    outputs:
+      - inferences-document
+    human-gate: true
+    gate-description: "Human reviews inferences before map generation"
+    skippable: false
+
+  - id: map
+    skill: tml-map
+    inputs:
+      - confirmed-primitives
+      - inferences-document
+    outputs:
+      - the-map
+      - the-changelog
+      - the-agent-brief
+    human-gate: true
+    gate-description: "Human confirms the map — one round of corrections"
+    skippable: false
+
+  - id: so-what
+    skill: tml-so-what
+    inputs:
+      - the-map
+      - the-changelog
+    outputs:
+      - so-what-analysis
+    human-gate: false
+    skippable: false
+
+  - id: hygiene
+    skill: tml-hygiene
+    inputs:
+      - the-map
+      - the-changelog
+      - the-agent-brief
+      - inferences-document
+      - so-what-analysis
+    outputs:
+      - hygiene-report
+    human-gate: false
+    skippable: false
+
+# Shared data contracts.
+# Every artifact named above has a schema in references/.
+# Agents should read the relevant schema before producing output.
+
+schemas:
+  context-dump: references/context-dump.md
+  candidate-primitives: references/candidate-primitives.md
+  confirmed-primitives: references/confirmed-primitives.md
+  conversation-log: references/conversation-log.md
+  inferences-document: references/inferences-document.md
+  the-map: references/the-map.md
+  the-changelog: references/the-changelog.md
+  the-agent-brief: references/the-agent-brief.md
+  so-what-analysis: references/so-what-analysis.md
+  hygiene-report: references/hygiene-report.md
